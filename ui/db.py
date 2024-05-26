@@ -1,6 +1,8 @@
 import sqlite3
 import click
 from flask import current_app, g
+from werkzeug.security import generate_password_hash
+
 
 def get_db():
     if "db" not in g:
@@ -23,6 +25,15 @@ def init_db():
 
     with current_app.open_resource("schema.sql") as f:
         db.executescript(f.read().decode('utf8'))
+
+    default_username = "admin"
+    default_password = generate_password_hash("admin")
+
+    db.execute(
+        "INSERT INTO user (username, password) VALUES (?, ?)",
+        (default_username, default_password),
+    )
+    db.commit()
 
 @click.command("init-db")
 def init_db_command():

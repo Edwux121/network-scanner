@@ -1,10 +1,11 @@
 import functools
+import re
 
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
 
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .db import get_db
 
@@ -24,6 +25,9 @@ def login():
         if user is None or not check_password_hash(user["password"], password):
             error = "Incorrect credentials!"
 
+        if user["first_login"] == 1:
+            return redirect(url_for("auth.reset_password"))
+
         if error is None:
             session.clear()
             session["user_id"] = user["id"]
@@ -32,6 +36,49 @@ def login():
         flash(error)
 
     return render_template("auth/login.html")
+
+def check_password(password):
+    if len(password) < 8:
+        return False
+    elif not re.search("[a-z]", password):
+        return False
+    elif not re.search("[A-Z]", password):
+        return False
+    elif not re.search("[0-9]", password):
+        return False
+
+    return True
+
+@bp.route("/reset_password", methods=("GET", "POST"))
+def reset_password():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        db = get_db()
+        user = db.execute(
+            "SELECT * FROM user WHERE username = ?", (username,)
+        ).fetchone()
+        error = None
+
+        if not check_password(password):
+            error = ("Password must be at least 8 characters long and contain at least one lowercase letter, "
+                     "one uppercase letter, and one number.")
+
+        if error is None:
+            db.execute(
+                "UPDATE user SET first_login = 0 WHERE username = ?", (username,)
+            )
+            db.execute(
+                "UPDATE user SET password = ? WHERE username = ?", (generate_password_hash(password), username,)
+            )
+            db.commit()
+            session.clear()
+            session["user_id"] = user["id"]
+            return redirect(url_for("index"))
+
+        flash(error)
+
+    return render_template("auth/reset_password.html")
 
 @bp.route("/logout")
 def logout():
