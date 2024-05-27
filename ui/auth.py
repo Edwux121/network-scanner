@@ -26,6 +26,9 @@ def login():
             error = "Incorrect credentials!"
 
         if user["first_login"] == 1:
+            session.clear()
+            session["user_id"] = user["id"]
+            session["password_changed"] = False
             return redirect(url_for("auth.reset_password"))
 
         if error is None:
@@ -37,14 +40,14 @@ def login():
 
     return render_template("auth/login.html")
 
-def check_password(password):
-    if len(password) < 8:
+def check_password(password, re_password):
+    if len(password) < 8 and len(re_password) < 8:
         return False
-    elif not re.search("[a-z]", password):
+    elif not re.search("[a-z]", password) and not re.search("[a-z]", re_password):
         return False
-    elif not re.search("[A-Z]", password):
+    elif not re.search("[A-Z]", password) and not re.search("[A-Z]", re_password):
         return False
-    elif not re.search("[0-9]", password):
+    elif not re.search("[0-9]", password) and not re.search("[0-9]", re_password):
         return False
 
     return True
@@ -54,15 +57,18 @@ def reset_password():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+        re_password = request.form["re-password"]
         db = get_db()
         user = db.execute(
             "SELECT * FROM user WHERE username = ?", (username,)
         ).fetchone()
         error = None
 
-        if not check_password(password):
+        if not check_password(password, re_password):
             error = ("Password must be at least 8 characters long and contain at least one lowercase letter, "
                      "one uppercase letter, and one number.")
+        elif password != re_password:
+            error = "Passwords do not match."
 
         if error is None:
             db.execute(
@@ -74,6 +80,7 @@ def reset_password():
             db.commit()
             session.clear()
             session["user_id"] = user["id"]
+            session["password_changed"] = True
             return redirect(url_for("index"))
 
         flash(error)
@@ -95,6 +102,14 @@ def load_logged_in_user():
         g.user = get_db().execute(
             "SELECT * FROM user WHERE id = ?", (user_id,)
         ).fetchone()
+
+@bp.before_app_request
+def check_password_change():
+    if (request.endpoint != 'auth.reset_password' and
+            request.endpoint != 'static' and
+            session.get("password_changed") == False):
+        session.clear()
+        return redirect(url_for("auth.reset_password"))
 
 def login_required(view):
     @functools.wraps(view)
