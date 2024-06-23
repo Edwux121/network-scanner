@@ -1,6 +1,8 @@
 import functools
 import re
 
+from network import nmap_test
+
 from flask import (
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
@@ -49,7 +51,6 @@ def check_password(password, re_password):
         return False
     elif not re.search("[0-9]", password) and not re.search("[0-9]", re_password):
         return False
-
     return True
 
 @bp.route("/reset_password", methods=("GET", "POST"))
@@ -86,6 +87,11 @@ def reset_password():
         flash(error)
 
     return render_template("auth/reset_password.html")
+
+@bp.route("/scan_network")
+def scan_network():
+    nmap_test.scan()
+    return redirect(url_for("index"))
 
 @bp.route("/logout")
 def logout():

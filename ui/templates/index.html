@@ -19,5 +19,8 @@
     {% for message in get_flashed_messages() %}
         <div class="flash">{{ message }}</div>
     {% endfor %}
-    {% block content %}{% endblock %}
+<!--TODO: Make only visible after login-->
+    {% block content %}
+        {% include "auth/actions.html" %}
+    {% endblock %}
 </section>
